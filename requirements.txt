@@ -1,5 +1,0 @@
-langchain
-langchain-chroma
-langchain_huggingface
-langchain-core
-langchain-text-splitters

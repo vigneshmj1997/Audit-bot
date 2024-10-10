@@ -6,11 +6,23 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 import langchain
+from langchain_huggingface.llms import HuggingFacePipeline
+from langchain_huggingface.llms import HuggingFacePipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 langchain.debug = True
 
 
 model_path = 'Alibaba-NLP/gte-large-en-v1.5'
+
+model_id = "microsoft/Phi-3.5-mini-instruct"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(model_id)
+pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=10)
+llm = HuggingFacePipeline(pipeline=pipe)
+
+
+# using this for prototyping will get same results for when hosted locally
 
 
 vector_store = Chroma(
