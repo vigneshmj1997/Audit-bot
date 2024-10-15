@@ -1,7 +1,7 @@
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_chroma import Chroma
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate,PromptTemplate
 #from langchain_openai import OpenAIEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
@@ -9,8 +9,10 @@ import langchain
 from langchain_huggingface.llms import HuggingFacePipeline
 from langchain_huggingface.llms import HuggingFacePipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from langchain_huggingface import HuggingFaceEndpoint
+import os
 
-langchain.debug = True
+langchain.debug = False
 
 
 model_path = 'Alibaba-NLP/gte-large-en-v1.5'
@@ -18,9 +20,15 @@ model_path = 'Alibaba-NLP/gte-large-en-v1.5'
 model_id = "microsoft/Phi-3.5-mini-instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(model_id)
-pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_new_tokens=10)
+pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, max_length=256)
 llm = HuggingFacePipeline(pipeline=pipe)
 
+# llm = HuggingFaceEndpoint(
+#     repo_id=model_id,
+#     max_length=256,
+#     temperature=0.5,
+#     huggingfacehub_api_token="__HF__TOKEN",
+# )
 
 # using this for prototyping will get same results for when hosted locally
 
@@ -32,27 +40,37 @@ vector_store = Chroma(
 )
 
 
-# 2. Incorporate the retriever into a question-answering chain.
-system_prompt = (
-    "You are an assistant for question-answering tasks. "
-    "Use the following pieces of retrieved context to answer "
-    "the question. If you don't know the answer, say that you "
-    "Make the answer descriptive and informative."
-    "Do not mention context in the answer"
-    "Include all the points in the answer make it informative"
-    "Mention all the clause and rules"
-    "\n\n"
-    "{context}"
+# Change in template
+prompt_template = """
+<|system|>
+You are an assistant for question-answering tasks. 
+Use the following pieces of retrieved context to answer 
+the question. If you don't know the answer, say that you 
+Make the answer descriptive and informative.
+Do not mention context in the answer
+Include all the points in the answer make it informative
+Mention all the clause and rules
+{context}
+<|end|>
+
+<|user|>
+
+{input}
+
+<|end|>
+
+<|assistant|>
+"""
+
+prompt = PromptTemplate(
+    template=prompt_template,
+    input_variables = ["context", "input"],
 )
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system_prompt),
-        ("human", "{input}"),
-    ]
-)
 
+#print(prompt)
 question_answer_chain = create_stuff_documents_chain(llm, prompt)
+
 retrieved_doc = vector_store.as_retriever(search_type="similarity",search_kwargs={"k": 2})
 
 rag_chain = create_retrieval_chain(retrieved_doc, question_answer_chain)
